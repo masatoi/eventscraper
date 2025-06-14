@@ -1,6 +1,7 @@
 """
 スクレイパーの基底クラス
 """
+
 from abc import ABC, abstractmethod
 from typing import List, Optional, Any
 import aiohttp
