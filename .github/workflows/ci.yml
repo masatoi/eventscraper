@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install coverage-badge
+
+      - name: Run tests
+        run: |
+          pytest --cov=src --cov-report=xml --cov-report=term
+
+      - name: Generate coverage badge
+        run: coverage-badge -o coverage.svg -f
+
+      - name: Commit coverage badge
+        if: github.ref == 'refs/heads/main'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: coverage.svg
+          message: 'chore: update coverage badge'
+          default_author: github_actions
