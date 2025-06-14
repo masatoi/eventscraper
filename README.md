@@ -1,5 +1,5 @@
 # Event Scraper
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml) [![Coverage](coverage.svg)](coverage.svg)
+[![CI](https://github.com/masatoi/eventscraper/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml) [![Coverage](coverage.svg)](coverage.svg)
 
 
 Hacker Newsなどの指定したサイトをスクレイピングして、機械学習モデルから利用できる統一的なデータフォーマットに変換するツールです。
