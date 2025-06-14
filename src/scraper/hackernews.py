@@ -1,6 +1,7 @@
 """
 Hacker News用スクレイパー
 """
+
 import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime

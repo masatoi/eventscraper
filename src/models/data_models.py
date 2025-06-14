@@ -1,6 +1,7 @@
 """
 統一的なデータフォーマットのためのPydanticモデル定義
 """
+
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, HttpUrl
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 class Author(BaseModel):
     """投稿者情報"""
+
     username: str
     profile_url: Optional[HttpUrl] = None
     karma: Optional[int] = None
@@ -15,17 +17,19 @@ class Author(BaseModel):
 
 class Comment(BaseModel):
     """コメント情報"""
+
     id: str
     author: Author
     content: str
     timestamp: datetime
     score: Optional[int] = None
     parent_id: Optional[str] = None
-    replies: List['Comment'] = Field(default_factory=list)
+    replies: List["Comment"] = Field(default_factory=list)
 
 
 class Article(BaseModel):
     """記事/投稿の統一データモデル"""
+
     id: str
     title: str
     url: Optional[HttpUrl] = None
@@ -43,6 +47,7 @@ class Article(BaseModel):
 
 class ScrapingResult(BaseModel):
     """スクレイピング結果の全体"""
+
     site: str
     scraped_at: datetime
     articles: List[Article]

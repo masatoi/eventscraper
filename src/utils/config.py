@@ -1,6 +1,7 @@
 """
 設定管理ユーティリティ
 """
+
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List

@@ -1,6 +1,7 @@
 """
 スクレイパーマネージャー - 複数サイトの並行スクレイピングを管理
 """
+
 import asyncio
 from typing import List, Dict, Type
 from datetime import datetime
