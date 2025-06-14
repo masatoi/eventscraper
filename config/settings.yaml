@@ -1,0 +1,43 @@
+# Event Scraper Configuration
+
+# デフォルト設定
+defaults:
+  limit: 30  # 取得する記事数
+  timeout: 30  # HTTPタイムアウト（秒）
+  concurrent_requests: 10  # 同時リクエスト数
+  output_format: "json"  # json, csv, both
+  output_dir: "output"  # 出力ディレクトリ
+
+# サイト別設定
+sites:
+  hackernews:
+    enabled: true
+    api_base: "https://hacker-news.firebaseio.com/v0"
+    web_base: "https://news.ycombinator.com"
+    rate_limit: 1.0  # リクエスト間隔（秒）
+    
+  # 将来的に追加予定
+  # reddit:
+  #   enabled: false
+  #   api_base: "https://www.reddit.com"
+  #   rate_limit: 2.0
+  
+  # techcrunch:
+  #   enabled: false
+  #   web_base: "https://techcrunch.com"
+  #   rate_limit: 1.5
+
+# ログ設定
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}"
+  file: "logs/scraper.log"
+  rotation: "1 day"
+  retention: "7 days"
+
+# エクスポート設定
+export:
+  include_metadata: true
+  include_content: true
+  include_comments: false  # 将来的にコメントも取得する場合
+  timestamp_format: "iso"  # iso, unix
