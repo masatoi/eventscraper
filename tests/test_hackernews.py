@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.scraper.hackernews import HackerNewsScraper
 from src.models.data_models import Article, Author
