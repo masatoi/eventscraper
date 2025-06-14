@@ -49,9 +49,7 @@ def setup_logging():
 
 
 @click.command()
-@click.option(
-    "--sites", "-s", multiple=True, help="スクレイピング対象サイト (例: hackernews)"
-)
+@click.option("--sites", "-s", multiple=True, help="スクレイピング対象サイト (例: hackernews)")
 @click.option("--limit", "-l", default=None, type=int, help="取得する記事数")
 @click.option("--output", "-o", help="出力ファイルパス")
 @click.option(
@@ -114,9 +112,7 @@ def main(
     if not sites:
         sites = tuple(config.get_enabled_sites())
         if not sites:
-            click.echo(
-                "エラー: スクレイピング対象サイトが指定されていません。", err=True
-            )
+            click.echo("エラー: スクレイピング対象サイトが指定されていません。", err=True)
             click.echo(
                 "--sites オプションでサイトを指定するか、--list-sites で利用可能なサイトを確認してください。",
                 err=True,
