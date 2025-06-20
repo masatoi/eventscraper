@@ -67,9 +67,13 @@ class HackerNewsScraper(BaseScraper):
             # 記事URL（外部リンクまたはHN内のディスカッション）
             article_url_raw = story_data.get("url")
             if not article_url_raw:
-                article_url_raw = f"https://news.ycombinator.com/item?id={story_data['id']}"
-            
-            article_url: Optional[HttpUrl] = HttpUrl(article_url_raw) if article_url_raw else None
+                article_url_raw = (
+                    f"https://news.ycombinator.com/item?id={story_data['id']}"
+                )
+
+            article_url: Optional[HttpUrl] = (
+                HttpUrl(article_url_raw) if article_url_raw else None
+            )
 
             # ソースURL（HNのディスカッションページ）
             source_url_str = f"https://news.ycombinator.com/item?id={story_data['id']}"

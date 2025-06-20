@@ -25,7 +25,10 @@ class DataExporter:
             output_path = Path(output_path)
 
             # Pydanticモデルを辞書に変換
-            export_data: Dict[str, Any] = {"exported_at": datetime.now().isoformat(), "sites": []}
+            export_data: Dict[str, Any] = {
+                "exported_at": datetime.now().isoformat(),
+                "sites": [],
+            }
 
             for result in results:
                 site_data = {
