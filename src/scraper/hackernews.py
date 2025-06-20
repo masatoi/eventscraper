@@ -3,9 +3,10 @@ Hacker News用スクレイパー
 """
 
 import json
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from loguru import logger
+from pydantic import HttpUrl
 
 from .base import BaseScraper
 from ..models.data_models import Article, Author
@@ -57,18 +58,22 @@ class HackerNewsScraper(BaseScraper):
 
             # 作者情報
             profile_url_str = f"https://news.ycombinator.com/user?id={story_data['by']}"
-            author = Author(username=story_data["by"], profile_url=profile_url_str)
+            profile_url: Optional[HttpUrl] = HttpUrl(profile_url_str)
+            author = Author(username=story_data["by"], profile_url=profile_url)
 
             # タイムスタンプ変換
             timestamp = datetime.fromtimestamp(story_data["time"])
 
             # 記事URL（外部リンクまたはHN内のディスカッション）
-            article_url = story_data.get("url")
-            if not article_url:
-                article_url = f"https://news.ycombinator.com/item?id={story_data['id']}"
+            article_url_raw = story_data.get("url")
+            if not article_url_raw:
+                article_url_raw = f"https://news.ycombinator.com/item?id={story_data['id']}"
+            
+            article_url: Optional[HttpUrl] = HttpUrl(article_url_raw) if article_url_raw else None
 
             # ソースURL（HNのディスカッションページ）
             source_url_str = f"https://news.ycombinator.com/item?id={story_data['id']}"
+            source_url: HttpUrl = HttpUrl(source_url_str)
 
             article = Article(
                 id=str(story_data["id"]),
@@ -80,7 +85,7 @@ class HackerNewsScraper(BaseScraper):
                 score=story_data.get("score", 0),
                 comments_count=story_data.get("descendants", 0),
                 source_site="hackernews",
-                source_url=source_url_str,
+                source_url=source_url,
                 metadata={
                     "type": story_data.get("type", "story"),
                     "hn_id": story_data["id"],

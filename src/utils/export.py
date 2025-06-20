@@ -5,7 +5,7 @@
 import json
 import csv
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Dict, Any
 from datetime import datetime
 import pandas as pd
 from loguru import logger
@@ -25,7 +25,7 @@ class DataExporter:
             output_path = Path(output_path)
 
             # Pydanticモデルを辞書に変換
-            export_data = {"exported_at": datetime.now().isoformat(), "sites": []}
+            export_data: Dict[str, Any] = {"exported_at": datetime.now().isoformat(), "sites": []}
 
             for result in results:
                 site_data = {

@@ -9,6 +9,7 @@ from loguru import logger
 
 from .base import BaseScraper
 from .hackernews import HackerNewsScraper
+from .reuters_japan import ReutersJapanScraper
 from ..models.data_models import ScrapingResult
 
 
@@ -18,6 +19,7 @@ class ScraperManager:
     def __init__(self) -> None:
         self.scrapers: Dict[str, Type[BaseScraper]] = {
             "hackernews": HackerNewsScraper,
+            "reuters_japan": ReutersJapanScraper,
             # 将来的に他のサイトを追加
             # 'reddit': RedditScraper,
             # 'techcrunch': TechCrunchScraper,
@@ -44,7 +46,7 @@ class ScraperManager:
         scraper_class = self.scrapers[site_name]
 
         try:
-            scraper_instance = scraper_class()
+            scraper_instance: BaseScraper = scraper_class()  # type: ignore
             async with scraper_instance as scraper:
                 result = await scraper.scrape(limit)
                 return result
@@ -73,7 +75,7 @@ class ScraperManager:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 例外が発生したタスクの処理
-        final_results = []
+        final_results: List[ScrapingResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"Exception in scraping {sites[i]}: {result}")
@@ -89,7 +91,8 @@ class ScraperManager:
                     )
                 )
             else:
-                final_results.append(result)
+                # result is ScrapingResult at this point
+                final_results.append(result)  # type: ignore
 
         # 結果のサマリーをログ出力
         total_articles = sum(r.success_count for r in final_results)

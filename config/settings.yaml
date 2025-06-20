@@ -16,6 +16,12 @@ sites:
     web_base: "https://news.ycombinator.com"
     rate_limit: 1.0  # リクエスト間隔（秒）
     
+  reuters_japan:
+    enabled: true
+    web_base: "https://jp.reuters.com"
+    markets_url: "https://jp.reuters.com/markets/"
+    rate_limit: 2.0  # リクエスト間隔（秒）
+    
   # 将来的に追加予定
   # reddit:
   #   enabled: false
