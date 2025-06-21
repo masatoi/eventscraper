@@ -221,3 +221,118 @@ class ReutersJapanScraper(BaseScraper):
 
         logger.info(f"Successfully parsed {len(articles)} articles from Reuters Japan")
         return articles
+
+    async def _validate_site_specific(self) -> Dict[str, Any]:
+        """Reuters Japan固有の検証"""
+        try:
+            issues = []
+
+            # マーケットページの基本チェック
+            market_url = f"{self.base_url}/markets/"
+            market_page = await self.fetch_page(market_url)
+            if market_page is None:
+                return {
+                    "success": False,
+                    "error": "Reuters Japan markets page not accessible",
+                    "critical": True,
+                }
+
+            # ページにReutersブランドが含まれているかチェック
+            if "Reuters" not in market_page and "ロイター" not in market_page:
+                issues.append("Reuters Japan page content appears to have changed")
+
+            # Fusion.globalContentの存在チェック
+            if "Fusion.globalContent" not in market_page:
+                return {
+                    "success": False,
+                    "error": "Fusion.globalContent not found in page",
+                    "critical": True,
+                }
+
+            # Fusionデータの抽出テスト
+            fusion_data = await self.extract_fusion_data(market_page)
+            if fusion_data is None:
+                return {
+                    "success": False,
+                    "error": "Failed to extract Fusion data",
+                    "critical": True,
+                }
+
+            # 記事データの存在確認
+            articles_data: List[Dict[str, Any]] = []
+            if "result" in fusion_data and isinstance(fusion_data["result"], dict):
+                result = fusion_data["result"]
+                possible_paths = [
+                    ["articles"],
+                    ["content", "articles"],
+                    ["items"],
+                    ["content", "items"],
+                ]
+
+                for path in possible_paths:
+                    current = result
+                    try:
+                        for key in path:
+                            if isinstance(current, dict) and key in current:
+                                current = current[key]
+                            else:
+                                break
+                        else:
+                            if isinstance(current, list):
+                                articles_data = current
+                                break
+                    except (KeyError, TypeError):
+                        continue
+
+            if not articles_data and isinstance(fusion_data.get("result"), list):
+                articles_data = fusion_data["result"]
+
+            if not articles_data:
+                return {
+                    "success": False,
+                    "error": "No article data found in Fusion structure",
+                    "critical": True,
+                }
+
+            if len(articles_data) < 5:
+                issues.append(f"Unusually few articles found: {len(articles_data)}")
+
+            # サンプル記事のデータ構造チェック
+            if articles_data:
+                sample_article = articles_data[0]
+                required_fields = ["id", "basic_headline", "canonical_url"]
+                missing_fields = [
+                    field for field in required_fields if not sample_article.get(field)
+                ]
+                if missing_fields:
+                    issues.append(
+                        f"Sample article missing required fields: {missing_fields}"
+                    )
+
+            # ベースURLの動作確認
+            base_check = await self.fetch_page(self.base_url)
+            if base_check is None:
+                issues.append("Reuters Japan base URL not accessible")
+
+            if issues:
+                return {
+                    "success": False,
+                    "error": "; ".join(issues),
+                    "critical": any(
+                        "critical" in issue.lower() or "Critical" in issue
+                        for issue in issues
+                    ),
+                }
+
+            return {
+                "success": True,
+                "fusion_data_found": fusion_data is not None,
+                "articles_count": len(articles_data),
+                "sample_article_id": articles_data[0].get("id")
+                if articles_data
+                else None,
+                "markets_page_accessible": market_page is not None,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": str(e), "critical": True}

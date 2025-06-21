@@ -10,7 +10,7 @@ from loguru import logger
 from .base import BaseScraper
 from .hackernews import HackerNewsScraper
 from .reuters_japan import ReutersJapanScraper
-from ..models.data_models import ScrapingResult
+from ..models.data_models import ScrapingResult, ValidationResult
 
 
 class ScraperManager:
@@ -99,6 +99,72 @@ class ScraperManager:
         total_errors = sum(r.error_count for r in final_results)
         logger.info(
             f"Scraping completed. Total articles: {total_articles}, Total errors: {total_errors}"
+        )
+
+        return final_results
+
+    async def validate_site(self, site_name: str) -> ValidationResult:
+        """単一サイトの検証"""
+        if site_name not in self.scrapers:
+            logger.error(f"Unknown site: {site_name}")
+            return ValidationResult(
+                site=site_name,
+                is_valid=False,
+                validated_at=datetime.now(),
+                validation_time_ms=0,
+                issues=[f"Unknown site: {site_name}"],
+            )
+
+        scraper_class = self.scrapers[site_name]
+
+        try:
+            scraper_instance: BaseScraper = scraper_class()  # type: ignore
+            async with scraper_instance as scraper:
+                result = await scraper.validate()
+                return result
+        except Exception as e:
+            logger.error(f"Error validating {site_name}: {e}")
+            return ValidationResult(
+                site=site_name,
+                is_valid=False,
+                validated_at=datetime.now(),
+                validation_time_ms=0,
+                issues=[str(e)],
+            )
+
+    async def validate_multiple_sites(self, sites: List[str]) -> List[ValidationResult]:
+        """複数サイトを並行検証"""
+        logger.info(f"Starting parallel validation for sites: {sites}")
+
+        # 並行実行用のタスクを作成
+        tasks = [self.validate_site(site) for site in sites]
+
+        # 全てのタスクを並行実行
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 例外が発生したタスクの処理
+        final_results: List[ValidationResult] = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Exception in validating {sites[i]}: {result}")
+                final_results.append(
+                    ValidationResult(
+                        site=sites[i],
+                        is_valid=False,
+                        validated_at=datetime.now(),
+                        validation_time_ms=0,
+                        issues=[str(result)],
+                    )
+                )
+            else:
+                # result is ValidationResult at this point
+                final_results.append(result)  # type: ignore
+
+        # 結果のサマリーをログ出力
+        valid_count = sum(1 for r in final_results if r.is_valid)
+        invalid_count = len(final_results) - valid_count
+        logger.info(
+            f"Validation completed. Valid: {valid_count}, Invalid: {invalid_count}"
         )
 
         return final_results

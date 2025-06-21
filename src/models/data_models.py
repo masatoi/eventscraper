@@ -57,5 +57,18 @@ class ScrapingResult(BaseModel):
     errors: List[str] = Field(default_factory=list)
 
 
+class ValidationResult(BaseModel):
+    """スクレイパー検証結果"""
+
+    site: str
+    is_valid: bool
+    validated_at: datetime
+    validation_time_ms: int
+    checks_performed: List[str] = Field(default_factory=list)
+    issues: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    sample_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+
 # Forward reference resolution
 Comment.model_rebuild()

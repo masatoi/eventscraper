@@ -3,7 +3,7 @@ Hacker News用スクレイパー
 """
 
 import json
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from loguru import logger
 from pydantic import HttpUrl
@@ -132,3 +132,82 @@ class HackerNewsScraper(BaseScraper):
 
         logger.info(f"Successfully parsed {len(articles)} articles from Hacker News")
         return articles
+
+    async def _validate_site_specific(self) -> Dict[str, Any]:
+        """Hacker News固有の検証"""
+        try:
+            issues = []
+
+            # Firebase APIの動作確認
+            api_check = await self.fetch_page(f"{self.api_base}/topstories.json")
+            if api_check is None:
+                return {
+                    "success": False,
+                    "error": "Firebase API not accessible",
+                    "critical": True,
+                }
+
+            try:
+                import json
+
+                story_ids = json.loads(api_check)
+                if not isinstance(story_ids, list) or len(story_ids) == 0:
+                    issues.append("Firebase API returned invalid data format")
+                elif len(story_ids) < 10:
+                    issues.append(
+                        f"Firebase API returned unusually few stories: {len(story_ids)}"
+                    )
+            except json.JSONDecodeError:
+                return {
+                    "success": False,
+                    "error": "Firebase API returned invalid JSON",
+                    "critical": True,
+                }
+
+            # 個別記事APIのチェック
+            if story_ids and len(story_ids) > 0:
+                sample_story_id = story_ids[0]
+                story_detail = await self.fetch_page(
+                    f"{self.api_base}/item/{sample_story_id}.json"
+                )
+                if story_detail is None:
+                    issues.append("Individual story API not accessible")
+                else:
+                    try:
+                        story_data = json.loads(story_detail)
+                        required_fields = ["id", "title", "by", "time"]
+                        missing_fields = [
+                            field
+                            for field in required_fields
+                            if field not in story_data
+                        ]
+                        if missing_fields:
+                            issues.append(
+                                f"Story data missing fields: {missing_fields}"
+                            )
+                    except json.JSONDecodeError:
+                        issues.append("Individual story API returned invalid JSON")
+
+            # ウェブサイトの基本チェック
+            web_check = await self.fetch_page("https://news.ycombinator.com")
+            if web_check is None:
+                issues.append("Hacker News website not accessible")
+            elif "Hacker News" not in web_check:
+                issues.append("Hacker News website content appears to have changed")
+
+            if issues:
+                return {
+                    "success": False,
+                    "error": "; ".join(issues),
+                    "critical": any("critical" in issue.lower() for issue in issues),
+                }
+
+            return {
+                "success": True,
+                "api_stories_count": len(story_ids) if "story_ids" in locals() else 0,
+                "sample_story_id": story_ids[0] if story_ids else None,
+                "website_accessible": web_check is not None,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": str(e), "critical": True}

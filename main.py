@@ -11,12 +11,12 @@ from typing import List, Optional
 import click
 from loguru import logger
 
-# プロジェクトのsrcディレクトリをパスに追加
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
 from src.scraper.manager import ScraperManager
 from src.utils.export import DataExporter
 from src.utils.config import config
+
+# プロジェクトのsrcディレクトリをパスに追加
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
 def setup_logging():
@@ -60,6 +60,7 @@ def setup_logging():
     help="出力フォーマット",
 )
 @click.option("--list-sites", is_flag=True, help="利用可能なサイト一覧を表示")
+@click.option("--validate", is_flag=True, help="スクレイパーの動作を検証")
 @click.option("--config-path", help="設定ファイルのパス")
 @click.option("--verbose", "-v", is_flag=True, help="詳細ログを出力")
 def main(
@@ -68,6 +69,7 @@ def main(
     output: Optional[str],
     output_format: Optional[str],
     list_sites: bool,
+    validate: bool,
     config_path: Optional[str],
     verbose: bool,
 ):
@@ -79,6 +81,8 @@ def main(
     python main.py --sites hackernews --limit 10 --output data.json
     python main.py --sites hackernews --format both
     python main.py --list-sites
+    python main.py --validate --sites hackernews
+    python main.py --validate  # 全有効サイトを検証
     """
 
     # 設定ファイルの再読み込み（カスタムパスが指定された場合）
@@ -106,6 +110,24 @@ def main(
         for site in available_sites:
             status = "有効" if site in enabled_sites else "無効"
             click.echo(f"  - {site} ({status})")
+        return
+
+    # 検証モード
+    if validate:
+        manager = ScraperManager()
+
+        # サイトが指定されていない場合は有効なサイトを検証
+        if not sites:
+            sites = tuple(config.get_enabled_sites())
+            if not sites:
+                click.echo("エラー: 検証対象サイトが指定されていません。", err=True)
+                click.echo(
+                    "--sites オプションでサイトを指定するか、--list-sites で利用可能なサイトを確認してください。", err=True
+                )
+                sys.exit(1)
+
+        # 非同期実行
+        asyncio.run(run_validation(list(sites)))
         return
 
     # サイトが指定されていない場合は有効なサイトを使用
@@ -192,7 +214,7 @@ async def run_scraping(sites: List[str], limit: int, output: Path, output_format
         total_articles = sum(r.success_count for r in results)
         total_errors = sum(r.error_count for r in results)
 
-        click.echo(f"\nスクレイピング完了:")
+        click.echo("\nスクレイピング完了:")
         click.echo(f"  取得記事数: {total_articles}")
         click.echo(f"  エラー数: {total_errors}")
 
@@ -201,6 +223,59 @@ async def run_scraping(sites: List[str], limit: int, output: Path, output_format
 
     except Exception as e:
         logger.error(f"Scraping failed: {e}")
+        click.echo(f"エラー: {e}", err=True)
+        sys.exit(1)
+
+
+async def run_validation(sites: List[str]):
+    """検証を実行"""
+    logger.info(f"Starting validation for sites: {sites}")
+
+    try:
+        # 検証実行
+        manager = ScraperManager()
+        results = await manager.validate_multiple_sites(sites)
+
+        # 結果の表示
+        click.echo("\n検証結果:")
+        click.echo("=" * 50)
+
+        all_valid = True
+        for result in results:
+            status_color = "green" if result.is_valid else "red"
+            status_text = "✓ VALID" if result.is_valid else "✗ INVALID"
+
+            click.echo(f"\n{result.site}: ", nl=False)
+            click.secho(f"{status_text}", fg=status_color, bold=True)
+            click.echo(f"  検証時間: {result.validation_time_ms}ms")
+            click.echo(f"  実行チェック: {', '.join(result.checks_performed)}")
+
+            if result.issues:
+                click.echo("  問題:")
+                for issue in result.issues:
+                    click.echo(f"    - {issue}")
+
+            if result.warnings:
+                click.echo("  警告:")
+                for warning in result.warnings:
+                    click.echo(f"    - {warning}")
+
+            if result.sample_data:
+                click.echo(f"  サンプルデータ: {len(result.sample_data)} 項目")
+
+            if not result.is_valid:
+                all_valid = False
+
+        # 全体結果
+        click.echo("\n" + "=" * 50)
+        if all_valid:
+            click.secho("全てのスクレイパーが正常に動作しています", fg="green", bold=True)
+        else:
+            click.secho("一部のスクレイパーに問題があります", fg="red", bold=True)
+            sys.exit(1)
+
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
         click.echo(f"エラー: {e}", err=True)
         sys.exit(1)
 

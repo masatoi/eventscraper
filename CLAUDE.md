@@ -12,6 +12,7 @@ pytest
 # Run specific test file
 pytest tests/test_hackernews.py
 pytest tests/test_reuters_japan.py
+pytest tests/test_validation.py
 
 # Run tests with coverage
 pytest --cov=src tests/
@@ -66,6 +67,10 @@ python main.py --sites hackernews --format both
 # List available sites
 python main.py --list-sites
 
+# Validate scrapers
+python main.py --validate --sites hackernews
+python main.py --validate  # validate all enabled sites
+
 # Run example
 python example.py
 ```
@@ -91,6 +96,8 @@ python example.py
 
 **Export System**: Flexible data export through `DataExporter` (src/utils/export.py:16) supporting JSON, CSV, and summary formats with proper datetime serialization.
 
+**Validation System**: Comprehensive scraper validation framework through `ValidationResult` model and base scraper validation methods. Validates connectivity, data fetching, data structure integrity, and site-specific functionality.
+
 ### Key Design Patterns
 
 - **Async Context Managers**: All scrapers use async context management for HTTP sessions
@@ -104,6 +111,7 @@ python example.py
 - **HTTP Headers**: Custom User-Agent "EventScraper/1.0 (Educational Purpose)" in base.py:26
 - **Logging**: Loguru-based logging with file rotation and structured format
 - **Data Validation**: Pydantic models with HttpUrl validation and field validation
+- **Scraper Validation**: Four-stage validation process (connectivity, data fetch, data structure, site-specific) with detailed error reporting and timing metrics
 
 ## Development Guidelines
 
