@@ -21,6 +21,12 @@ sites:
     web_base: "https://jp.reuters.com"
     markets_url: "https://jp.reuters.com/markets/"
     rate_limit: 2.0  # リクエスト間隔（秒）
+
+  yahoo_news_japan:
+    enabled: true
+    rss_url: "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
+    web_base: "https://news.yahoo.co.jp"
+    rate_limit: 1.0
     
   # 将来的に追加予定
   # reddit:

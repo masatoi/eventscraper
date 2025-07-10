@@ -25,6 +25,7 @@ class BaseScraper(ABC):
         self.session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=30),
             headers={"User-Agent": "EventScraper/1.0 (Educational Purpose)"},
+            trust_env=True,
         )
         return self
 

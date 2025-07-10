@@ -10,6 +10,7 @@ from loguru import logger
 from .base import BaseScraper
 from .hackernews import HackerNewsScraper
 from .reuters_japan import ReutersJapanScraper
+from .yahoo_news_japan import YahooNewsJapanScraper
 from ..models.data_models import ScrapingResult, ValidationResult
 
 
@@ -20,6 +21,7 @@ class ScraperManager:
         self.scrapers: Dict[str, Type[BaseScraper]] = {
             "hackernews": HackerNewsScraper,
             "reuters_japan": ReutersJapanScraper,
+            "yahoo_news_japan": YahooNewsJapanScraper,
             # 将来的に他のサイトを追加
             # 'reddit': RedditScraper,
             # 'techcrunch': TechCrunchScraper,
