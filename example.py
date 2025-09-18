@@ -2,6 +2,7 @@
 """
 Event Scraper の使用例
 """
+
 import asyncio
 import sys
 from pathlib import Path
@@ -13,7 +14,7 @@ from src.scraper.manager import ScraperManager
 from src.utils.export import DataExporter
 
 
-async def main():
+async def main() -> None:
     """サンプル実行"""
     print("Event Scraper - 使用例")
     print("=" * 40)

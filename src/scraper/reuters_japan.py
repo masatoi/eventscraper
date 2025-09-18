@@ -1,17 +1,18 @@
-"""
-Reuters Japan用スクレイパー
-"""
+"""Reuters Japan用スクレイパー."""
+
+from __future__ import annotations
 
 import json
 import re
-from typing import List, Optional, Dict, Any
 from datetime import datetime
-from loguru import logger
-from bs4 import BeautifulSoup
-from pydantic import HttpUrl
+from typing import Any, cast
 
-from .base import BaseScraper
+from bs4 import BeautifulSoup
+from loguru import logger
+from pydantic import HttpUrl, ValidationError
+
 from ..models.data_models import Article, Author
+from .base import BaseScraper
 
 
 class ReutersJapanScraper(BaseScraper):
@@ -20,7 +21,7 @@ class ReutersJapanScraper(BaseScraper):
     def __init__(self) -> None:
         super().__init__("reuters_japan", "https://jp.reuters.com")
 
-    async def extract_fusion_data(self, html_content: str) -> Optional[Dict[str, Any]]:
+    async def extract_fusion_data(self, html_content: str) -> dict[str, Any] | None:
         """HTMLからFusion.globalContentデータを抽出"""
         try:
             # BeautifulSoupでscriptタグを探す
@@ -38,7 +39,10 @@ class ReutersJapanScraper(BaseScraper):
 
                     if match:
                         json_str = match.group(1)
-                        return json.loads(json_str)
+                        parsed: dict[str, Any] = cast(
+                            dict[str, Any], json.loads(json_str)
+                        )
+                        return parsed
 
             logger.warning("Fusion.globalContent not found in HTML")
             return None
@@ -47,7 +51,7 @@ class ReutersJapanScraper(BaseScraper):
             logger.error(f"Error extracting Fusion data: {e}")
             return None
 
-    async def get_articles_from_page(self, url: str) -> List[Dict[str, Any]]:
+    async def get_articles_from_page(self, url: str) -> list[dict[str, Any]]:
         """ページから記事データを取得"""
         html_content = await self.fetch_page(url)
         if not html_content:
@@ -58,7 +62,7 @@ class ReutersJapanScraper(BaseScraper):
             return []
 
         # 記事リストを抽出
-        articles: List[Dict[str, Any]] = []
+        articles: list[dict[str, Any]] = []
 
         # resultの中のarticlesを探す
         if "result" in fusion_data and isinstance(fusion_data["result"], dict):
@@ -94,13 +98,14 @@ class ReutersJapanScraper(BaseScraper):
         logger.info(f"Found {len(articles)} articles in Fusion data")
         return articles
 
-    def parse_reuters_article(self, article_data: Dict[str, Any]) -> Optional[Article]:
+    def parse_reuters_article(self, article_data: dict[str, Any]) -> Article | None:
         """Reuters記事データをArticleモデルに変換"""
         try:
             # 必須フィールドのチェック
             if not article_data.get("id") or not article_data.get("basic_headline"):
                 logger.warning(
-                    f"Missing required fields in article {article_data.get('id', 'unknown')}"
+                    "Missing required fields in article {}",
+                    article_data.get("id", "unknown"),
                 )
                 return None
 
@@ -111,12 +116,20 @@ class ReutersJapanScraper(BaseScraper):
 
             # URL構築
             canonical_url = article_data.get("canonical_url", "")
-            article_url: Optional[str] = None
+            article_url: HttpUrl | None = None
             if canonical_url:
                 if canonical_url.startswith("/"):
-                    article_url = f"{self.base_url}{canonical_url}"
+                    url_candidate = f"{self.base_url}{canonical_url}"
                 else:
-                    article_url = canonical_url
+                    url_candidate = canonical_url
+
+                try:
+                    article_url = HttpUrl(url_candidate)
+                except ValidationError:
+                    logger.warning(
+                        "Invalid canonical URL for article {}", article_data.get("id")
+                    )
+                    return None
             else:
                 # URLがない場合はスキップ
                 logger.warning(f"No URL found for article {article_data.get('id')}")
@@ -126,10 +139,14 @@ class ReutersJapanScraper(BaseScraper):
             authors = article_data.get("authors", [])
             if authors and isinstance(authors, list) and len(authors) > 0:
                 author_data = authors[0]
+                fallback_name = (
+                    f"{author_data.get('first_name', '')} "
+                    f"{author_data.get('last_name', '')}"
+                ).strip()
                 author_name = (
                     author_data.get("name")
                     or author_data.get("byline")
-                    or f"{author_data.get('first_name', '')} {author_data.get('last_name', '')}".strip()
+                    or fallback_name
                     or "Reuters"
                 )
             else:
@@ -161,24 +178,17 @@ class ReutersJapanScraper(BaseScraper):
             # 記事内容（概要）
             content = article_data.get("description", "")
 
-            # article_urlは既にOptional[str]で、Noneでないことを確認済み
-            assert article_url is not None
-
-            # HttpUrlオブジェクトに変換
-            url_obj: HttpUrl = HttpUrl(article_url)
-            source_url_obj: HttpUrl = HttpUrl(article_url)
-
             article = Article(
                 id=str(article_data["id"]),
                 title=title,
-                url=url_obj,
+                url=article_url,
                 content=content,
                 author=author,
                 timestamp=timestamp,
                 score=None,  # Reutersにはスコアがない
                 comments_count=0,  # コメント数は取得しない
                 source_site="reuters_japan",
-                source_url=source_url_obj,
+                source_url=article_url,
                 metadata={
                     "section": article_data.get("taxonomy", {}).get("sections", []),
                     "reuters_id": article_data.get("id"),
@@ -190,11 +200,13 @@ class ReutersJapanScraper(BaseScraper):
 
         except Exception as e:
             logger.error(
-                f"Error parsing Reuters article {article_data.get('id', 'unknown')}: {e}"
+                "Error parsing Reuters article {}: {}",
+                article_data.get("id", "unknown"),
+                e,
             )
             return None
 
-    async def scrape_articles(self, limit: int = 30) -> List[Article]:
+    async def scrape_articles(self, limit: int = 30) -> list[Article]:
         """記事をスクレイピング"""
         logger.info(f"Fetching articles from Reuters Japan (limit: {limit})")
 
@@ -222,7 +234,7 @@ class ReutersJapanScraper(BaseScraper):
         logger.info(f"Successfully parsed {len(articles)} articles from Reuters Japan")
         return articles
 
-    async def _validate_site_specific(self) -> Dict[str, Any]:
+    async def _validate_site_specific(self) -> dict[str, Any]:
         """Reuters Japan固有の検証"""
         try:
             issues = []
@@ -259,7 +271,7 @@ class ReutersJapanScraper(BaseScraper):
                 }
 
             # 記事データの存在確認
-            articles_data: List[Dict[str, Any]] = []
+            articles_data: list[dict[str, Any]] = []
             if "result" in fusion_data and isinstance(fusion_data["result"], dict):
                 result = fusion_data["result"]
                 possible_paths = [
