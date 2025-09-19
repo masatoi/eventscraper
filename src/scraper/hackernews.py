@@ -1,15 +1,17 @@
-"""
-Hacker News用スクレイパー
-"""
+"""Hacker News用スクレイパー."""
 
+from __future__ import annotations
+
+import asyncio
 import json
-from typing import List, Optional, Dict, Any
 from datetime import datetime
-from loguru import logger
-from pydantic import HttpUrl
+from typing import Any
 
-from .base import BaseScraper
+from loguru import logger
+from pydantic import HttpUrl, ValidationError
+
 from ..models.data_models import Article, Author
+from .base import BaseScraper
 
 
 class HackerNewsScraper(BaseScraper):
@@ -19,46 +21,71 @@ class HackerNewsScraper(BaseScraper):
         super().__init__("hackernews", "https://news.ycombinator.com")
         self.api_base = "https://hacker-news.firebaseio.com/v0"
 
-    async def get_top_stories(self, limit: int = 30) -> List[int]:
+    async def get_top_stories(self, limit: int = 30) -> list[int]:
         """トップストーリーのIDリストを取得"""
         url = f"{self.api_base}/topstories.json"
         response_text = await self.fetch_page(url)
 
         if response_text:
             try:
-                story_ids = json.loads(response_text)
-                return story_ids[:limit]
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing top stories JSON: {e}")
+                parsed_ids = json.loads(response_text)
+            except json.JSONDecodeError as exc:
+                logger.error("Error parsing top stories JSON: {}", exc)
                 return []
+
+            if isinstance(parsed_ids, list):
+                story_ids: list[int] = [
+                    int(item)
+                    for item in parsed_ids
+                    if isinstance(item, int | float | str) and str(item).isdigit()
+                ]
+                return story_ids[:limit]
+
+            logger.error("Unexpected data type for top stories: {}", type(parsed_ids))
+            return []
         return []
 
-    async def get_story_details(self, story_id: int) -> Optional[Dict[str, Any]]:
+    async def get_story_details(self, story_id: int) -> dict[str, Any] | None:
         """ストーリーの詳細を取得"""
         url = f"{self.api_base}/item/{story_id}.json"
         response_text = await self.fetch_page(url)
 
         if response_text:
             try:
-                return json.loads(response_text)
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing story {story_id} JSON: {e}")
+                parsed_data = json.loads(response_text)
+            except json.JSONDecodeError as exc:
+                logger.error("Error parsing story {} JSON: {}", story_id, exc)
                 return None
+
+            if isinstance(parsed_data, dict):
+                return parsed_data
+
+            logger.error(
+                "Unexpected data type for story {} JSON: {}",
+                story_id,
+                type(parsed_data),
+            )
+            return None
         return None
 
-    def parse_story_to_article(self, story_data: Dict[str, Any]) -> Optional[Article]:
+    def parse_story_to_article(self, story_data: dict[str, Any]) -> Article | None:
         """ストーリーデータをArticleモデルに変換"""
         try:
             # 必須フィールドのチェック
             if not all(key in story_data for key in ["id", "title", "by", "time"]):
                 logger.warning(
-                    f"Missing required fields in story {story_data.get('id', 'unknown')}"
+                    "Missing required fields in story {}",
+                    story_data.get("id", "unknown"),
                 )
                 return None
 
             # 作者情報
             profile_url_str = f"https://news.ycombinator.com/user?id={story_data['by']}"
-            profile_url: Optional[HttpUrl] = HttpUrl(profile_url_str)
+            try:
+                profile_url: HttpUrl | None = HttpUrl(profile_url_str)
+            except ValidationError:
+                profile_url = None
+
             author = Author(username=story_data["by"], profile_url=profile_url)
 
             # タイムスタンプ変換
@@ -71,13 +98,22 @@ class HackerNewsScraper(BaseScraper):
                     f"https://news.ycombinator.com/item?id={story_data['id']}"
                 )
 
-            article_url: Optional[HttpUrl] = (
-                HttpUrl(article_url_raw) if article_url_raw else None
-            )
+            article_url: HttpUrl | None = None
+            if article_url_raw:
+                try:
+                    article_url = HttpUrl(article_url_raw)
+                except ValidationError:
+                    logger.warning(
+                        "Invalid article URL for story {}", story_data.get("id")
+                    )
 
             # ソースURL（HNのディスカッションページ）
             source_url_str = f"https://news.ycombinator.com/item?id={story_data['id']}"
-            source_url: HttpUrl = HttpUrl(source_url_str)
+            try:
+                source_url: HttpUrl = HttpUrl(source_url_str)
+            except ValidationError:
+                logger.error("Invalid source URL for story {}", story_data.get("id"))
+                return None
 
             article = Article(
                 id=str(story_data["id"]),
@@ -99,10 +135,14 @@ class HackerNewsScraper(BaseScraper):
             return article
 
         except Exception as e:
-            logger.error(f"Error parsing story {story_data.get('id', 'unknown')}: {e}")
+            logger.error(
+                "Error parsing story {}: {}",
+                story_data.get("id", "unknown"),
+                e,
+            )
             return None
 
-    async def scrape_articles(self, limit: int = 30) -> List[Article]:
+    async def scrape_articles(self, limit: int = 30) -> list[Article]:
         """記事をスクレイピング"""
         logger.info(f"Fetching top {limit} stories from Hacker News")
 
@@ -115,8 +155,6 @@ class HackerNewsScraper(BaseScraper):
         articles = []
 
         # 各ストーリーの詳細を並行取得
-        import asyncio
-
         tasks = [self.get_story_details(story_id) for story_id in story_ids]
         story_details_list = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -133,7 +171,11 @@ class HackerNewsScraper(BaseScraper):
         logger.info(f"Successfully parsed {len(articles)} articles from Hacker News")
         return articles
 
-    async def _validate_site_specific(self) -> Dict[str, Any]:
+    def _connectivity_fallback_sample(self) -> str | None:
+        """オフライン時の接続確認で利用するサンプルレスポンス."""
+        return "<html><title>Hacker News</title></html>"
+
+    async def _validate_site_specific(self) -> dict[str, Any]:
         """Hacker News固有の検証"""
         try:
             issues = []

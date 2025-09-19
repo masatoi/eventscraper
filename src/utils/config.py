@@ -1,41 +1,44 @@
-"""
-設定管理ユーティリティ
-"""
+"""設定管理ユーティリティ."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, TypeVar, cast
 
 import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, Union, List
 from loguru import logger
+
+T = TypeVar("T")
 
 
 class Config:
-    """設定管理クラス"""
+    """設定管理クラス."""
 
-    def __init__(self, config_path: Optional[Union[str, Path]] = None):
+    def __init__(self, config_path: str | Path | None = None) -> None:
         if config_path is None:
             config_path = (
                 Path(__file__).parent.parent.parent / "config" / "settings.yaml"
             )
 
         self.config_path = Path(config_path)
-        self._config: Dict[str, Any] = {}
+        self._config: dict[str, Any] = {}
         self.load_config()
 
     def load_config(self) -> None:
         """設定ファイルを読み込み"""
         try:
             if self.config_path.exists():
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    self._config = yaml.safe_load(f) or {}
-                logger.info(f"Configuration loaded from {self.config_path}")
+                with open(self.config_path, encoding="utf-8") as file:
+                    self._config = yaml.safe_load(file) or {}
+                logger.info("Configuration loaded from {}", self.config_path)
             else:
-                logger.warning(f"Configuration file not found: {self.config_path}")
+                logger.warning("Configuration file not found: {}", self.config_path)
                 self._config = self._get_default_config()
         except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
+            logger.error("Error loading configuration: {}", e)
             self._config = self._get_default_config()
 
-    def _get_default_config(self) -> Dict[str, Any]:
+    def _get_default_config(self) -> dict[str, Any]:
         """デフォルト設定を返す"""
         return {
             "defaults": {
@@ -55,7 +58,10 @@ class Config:
             },
             "logging": {
                 "level": "INFO",
-                "format": "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
+                "format": (
+                    "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line}"
+                    " - {message}"
+                ),
                 "file": "logs/scraper.log",
                 "rotation": "1 day",
                 "retention": "7 days",
@@ -68,51 +74,51 @@ class Config:
             },
         }
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: T | None = None) -> T | None:
         """設定値を取得（ドット記法対応）"""
         keys = key.split(".")
-        value = self._config
+        current: Any = self._config
 
         try:
             for k in keys:
-                value = value[k]
-            return value
+                current = current[k]
+            return cast(T | None, current)
         except (KeyError, TypeError):
             return default
 
-    def get_defaults(self) -> Dict[str, Any]:
+    def get_defaults(self) -> dict[str, Any]:
         """デフォルト設定を取得"""
-        result = self.get("defaults", {})
-        return result if isinstance(result, dict) else {}
+        defaults: Any = self.get("defaults", {})
+        return defaults if isinstance(defaults, dict) else {}
 
-    def get_site_config(self, site_name: str) -> Dict[str, Any]:
+    def get_site_config(self, site_name: str) -> dict[str, Any]:
         """サイト別設定を取得"""
-        result = self.get(f"sites.{site_name}", {})
-        return result if isinstance(result, dict) else {}
+        site_config: Any = self.get(f"sites.{site_name}", {})
+        return site_config if isinstance(site_config, dict) else {}
 
-    def get_logging_config(self) -> Dict[str, Any]:
+    def get_logging_config(self) -> dict[str, Any]:
         """ログ設定を取得"""
-        result = self.get("logging", {})
-        return result if isinstance(result, dict) else {}
+        logging_config: Any = self.get("logging", {})
+        return logging_config if isinstance(logging_config, dict) else {}
 
-    def get_export_config(self) -> Dict[str, Any]:
+    def get_export_config(self) -> dict[str, Any]:
         """エクスポート設定を取得"""
-        result = self.get("export", {})
-        return result if isinstance(result, dict) else {}
+        export_config: Any = self.get("export", {})
+        return export_config if isinstance(export_config, dict) else {}
 
     def is_site_enabled(self, site_name: str) -> bool:
         """サイトが有効かチェック"""
-        result = self.get(f"sites.{site_name}.enabled", False)
-        return bool(result)
+        site_enabled: Any = self.get(f"sites.{site_name}.enabled", False)
+        return bool(site_enabled)
 
-    def get_enabled_sites(self) -> List[str]:
+    def get_enabled_sites(self) -> list[str]:
         """有効なサイト一覧を取得"""
-        sites = self.get("sites", {})
-        if not isinstance(sites, dict):
+        sites_config: Any = self.get("sites", {})
+        if not isinstance(sites_config, dict):
             return []
         return [
             name
-            for name, config in sites.items()
+            for name, config in sites_config.items()
             if isinstance(config, dict) and config.get("enabled", False)
         ]
 

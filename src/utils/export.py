@@ -1,31 +1,29 @@
-"""
-データエクスポート用ユーティリティ
-"""
+"""データエクスポート用ユーティリティ."""
+
+from __future__ import annotations
 
 import json
-import csv
-from pathlib import Path
-from typing import List, Union, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
 from loguru import logger
 
-from ..models.data_models import ScrapingResult, Article
+from ..models.data_models import ScrapingResult
 
 
 class DataExporter:
     """データエクスポート用クラス"""
 
     @staticmethod
-    def export_to_json(
-        results: List[ScrapingResult], output_path: Union[str, Path]
-    ) -> bool:
+    def export_to_json(results: list[ScrapingResult], output_path: str | Path) -> bool:
         """JSONファイルにエクスポート"""
         try:
             output_path = Path(output_path)
 
             # Pydanticモデルを辞書に変換
-            export_data: Dict[str, Any] = {
+            export_data: dict[str, Any] = {
                 "exported_at": datetime.now().isoformat(),
                 "sites": [],
             }
@@ -83,9 +81,7 @@ class DataExporter:
             return False
 
     @staticmethod
-    def export_to_csv(
-        results: List[ScrapingResult], output_path: Union[str, Path]
-    ) -> bool:
+    def export_to_csv(results: list[ScrapingResult], output_path: str | Path) -> bool:
         """CSVファイルにエクスポート"""
         try:
             output_path = Path(output_path)
@@ -130,9 +126,7 @@ class DataExporter:
             return False
 
     @staticmethod
-    def export_summary(
-        results: List[ScrapingResult], output_path: Union[str, Path]
-    ) -> bool:
+    def export_summary(results: list[ScrapingResult], output_path: str | Path) -> bool:
         """サマリー情報をテキストファイルにエクスポート"""
         try:
             output_path = Path(output_path)
