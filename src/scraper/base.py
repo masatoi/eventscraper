@@ -6,7 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from loguru import logger
@@ -49,7 +49,8 @@ class BaseScraper(ABC):
         try:
             async with self.session.get(url) as response:
                 if response.status == 200:
-                    return await response.text()
+                    response_text = await response.text()
+                    return cast(str, response_text)
                 else:
                     logger.warning(f"HTTP {response.status} for {url}")
                     return None
