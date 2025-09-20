@@ -8,14 +8,43 @@ import sys
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Annotated
+from typing import Optional
 
+import click
 import typer
 from loguru import logger
 
 from src.scraper.manager import ScraperManager
 from src.utils.config import Config, config
 from src.utils.export import DataExporter
+
+
+def _patch_click_make_metavar() -> None:
+    """Ensure Click's Parameter.make_metavar accepts an optional context."""
+
+    if click.core.Parameter.make_metavar.__defaults__ is not None:
+        return
+
+    original_make_metavar = click.core.Parameter.make_metavar
+
+    def make_metavar_with_optional_ctx(
+        self: click.Parameter, ctx: Optional[click.Context] = None
+    ) -> str:
+        resolved_ctx = ctx or click.get_current_context(silent=True)
+        if resolved_ctx is None:
+            if self.metavar is not None:
+                return self.metavar
+            metavar = self.type.name.upper()
+            if self.nargs != 1:
+                return f"{metavar}..."
+            return metavar
+        return original_make_metavar(self, resolved_ctx)
+
+    click.core.Parameter.make_metavar = make_metavar_with_optional_ctx  # type: ignore[assignment]
+
+
+_patch_click_make_metavar()
+
 
 app = typer.Typer(add_completion=False, help="WebサイトをスクレイピングするCLIツール")
 
@@ -26,67 +55,6 @@ class OutputFormat(str, Enum):
     JSON = "json"
     CSV = "csv"
     BOTH = "both"
-
-
-SitesOption = Annotated[
-    list[str] | None,
-    typer.Option(
-        None,
-        "--sites",
-        "-s",
-        help="スクレイピング対象サイト (例: hackernews)",
-    ),
-]
-LimitOption = Annotated[
-    int | None,
-    typer.Option(None, "--limit", "-l", help="取得する記事数"),
-]
-OutputPathOption = Annotated[
-    Path | None,
-    typer.Option(None, "--output", "-o", help="出力ファイルパス"),
-]
-OutputFormatOption = Annotated[
-    OutputFormat | None,
-    typer.Option(
-        None,
-        "--format",
-        "-f",
-        help="出力フォーマット",
-        case_sensitive=False,
-    ),
-]
-ListSitesFlag = Annotated[
-    bool,
-    typer.Option(
-        False,
-        "--list-sites",
-        help="利用可能なサイト一覧を表示",
-        is_flag=True,
-    ),
-]
-ValidateFlag = Annotated[
-    bool,
-    typer.Option(
-        False,
-        "--validate",
-        help="スクレイパーの動作を検証",
-        is_flag=True,
-    ),
-]
-ConfigPathOption = Annotated[
-    Path | None,
-    typer.Option(None, "--config-path", help="設定ファイルのパス"),
-]
-VerboseFlag = Annotated[
-    bool,
-    typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="詳細ログを出力",
-        is_flag=True,
-    ),
-]
 
 
 def setup_logging(verbose: bool) -> None:
@@ -119,14 +87,55 @@ def setup_logging(verbose: bool) -> None:
 
 @app.command()
 def main(
-    sites: SitesOption = None,
-    limit: LimitOption = None,
-    output: OutputPathOption = None,
-    output_format: OutputFormatOption = None,
-    list_sites: ListSitesFlag = False,
-    validate: ValidateFlag = False,
-    config_path: ConfigPathOption = None,
-    verbose: VerboseFlag = False,
+    sites: Optional[list[str]] = typer.Option(
+        None,
+        "--sites",
+        "-s",
+        help="スクレイピング対象サイト (例: hackernews)",
+    ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        "-l",
+        help="取得する記事数",
+    ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="出力ファイルパス",
+    ),
+    output_format: Optional[OutputFormat] = typer.Option(
+        None,
+        "--format",
+        "-f",
+        help="出力フォーマット",
+        case_sensitive=False,
+    ),
+    list_sites: bool = typer.Option(
+        False,
+        "--list-sites",
+        help="利用可能なサイト一覧を表示",
+        is_flag=True,
+    ),
+    validate: bool = typer.Option(
+        False,
+        "--validate",
+        help="スクレイパーの動作を検証",
+        is_flag=True,
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config-path",
+        help="設定ファイルのパス",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="詳細ログを出力",
+        is_flag=True,
+    ),
 ) -> None:
     """Event Scraperのメインコマンド."""
     selected_sites = list(sites or [])
@@ -153,10 +162,7 @@ def main(
         if not selected_sites:
             typer.echo("エラー: 検証対象サイトが指定されていません。", err=True)
             typer.echo(
-                (
-                    "--sites オプションでサイトを指定するか、--list-sites で"
-                    "利用可能なサイトを確認してください。"
-                ),
+                ("--sites オプションでサイトを指定するか、--list-sites で" "利用可能なサイトを確認してください。"),
                 err=True,
             )
             raise typer.Exit(code=1)
@@ -173,10 +179,7 @@ def main(
     if not selected_sites:
         typer.echo("エラー: スクレイピング対象サイトが指定されていません。", err=True)
         typer.echo(
-            (
-                "--sites オプションでサイトを指定するか、--list-sites で"
-                "利用可能なサイトを確認してください。"
-            ),
+            ("--sites オプションでサイトを指定するか、--list-sites で" "利用可能なサイトを確認してください。"),
             err=True,
         )
         raise typer.Exit(code=1)
