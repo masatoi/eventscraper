@@ -8,7 +8,6 @@ import sys
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 import click
 import typer
@@ -28,7 +27,7 @@ def _patch_click_make_metavar() -> None:
     original_make_metavar = click.core.Parameter.make_metavar
 
     def make_metavar_with_optional_ctx(
-        self: click.Parameter, ctx: Optional[click.Context] = None
+        self: click.Parameter, ctx: click.Context | None = None
     ) -> str:
         resolved_ctx = ctx or click.get_current_context(silent=True)
         if resolved_ctx is None:
@@ -87,25 +86,25 @@ def setup_logging(verbose: bool) -> None:
 
 @app.command()
 def main(
-    sites: Optional[list[str]] = typer.Option(
+    sites: list[str] | None = typer.Option(
         None,
         "--sites",
         "-s",
         help="スクレイピング対象サイト (例: hackernews)",
     ),
-    limit: Optional[int] = typer.Option(
+    limit: int | None = typer.Option(
         None,
         "--limit",
         "-l",
         help="取得する記事数",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
         help="出力ファイルパス",
     ),
-    output_format: Optional[OutputFormat] = typer.Option(
+    output_format: OutputFormat | None = typer.Option(
         None,
         "--format",
         "-f",
@@ -124,7 +123,7 @@ def main(
         help="スクレイパーの動作を検証",
         is_flag=True,
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None,
         "--config-path",
         help="設定ファイルのパス",

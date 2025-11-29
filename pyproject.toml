@@ -49,6 +49,7 @@ select = [
 ignore = [
   "ANN101",
   "ANN102",
+  "B008",  # Function call in argument defaults is standard pattern for Typer
 ]
 
 [tool.ruff.format]
