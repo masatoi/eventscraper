@@ -162,7 +162,10 @@ def main(
         if not selected_sites:
             typer.echo("エラー: 検証対象サイトが指定されていません。", err=True)
             typer.echo(
-                ("--sites オプションでサイトを指定するか、--list-sites で" "利用可能なサイトを確認してください。"),
+                (
+                    "--sites オプションでサイトを指定するか、--list-sites で"
+                    "利用可能なサイトを確認してください。"
+                ),
                 err=True,
             )
             raise typer.Exit(code=1)
@@ -179,7 +182,10 @@ def main(
     if not selected_sites:
         typer.echo("エラー: スクレイピング対象サイトが指定されていません。", err=True)
         typer.echo(
-            ("--sites オプションでサイトを指定するか、--list-sites で" "利用可能なサイトを確認してください。"),
+            (
+                "--sites オプションでサイトを指定するか、--list-sites で"
+                "利用可能なサイトを確認してください。"
+            ),
             err=True,
         )
         raise typer.Exit(code=1)
